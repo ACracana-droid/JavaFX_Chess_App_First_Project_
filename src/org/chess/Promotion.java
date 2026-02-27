@@ -13,7 +13,7 @@ import javafx.scene.shape.Rectangle;
 import java.util.function.Function;
 
 import static org.chess.ChessBoard.root;
-import static org.chess.ChessBoard.visualBoard;
+import static org.chess.ChessBoard.graphicBoard;
 import static org.chess.GameLoop.updateGameLoop;
 import static org.chess.TeamAttributes.BLACK_TEAM;
 import static org.chess.TeamAttributes.WHITE_TEAM;
@@ -38,16 +38,16 @@ public class Promotion {
 
         // This is the only thing a little bit beyond my means. It is like a Lambda function.
         // It can call the constructor of the class. Hence, 'new'.
-        public final Function<TeamAttributes, Piece> function;
+        public final Function<TeamAttributes, GraphicPiece> function;
 
-        PromotionEnum(String displayName, String partialFileName, Function<TeamAttributes, Piece> function) {
+        PromotionEnum(String displayName, String partialFileName, Function<TeamAttributes, GraphicPiece> function) {
             this.displayName = displayName;
             this.partialFileName = partialFileName;
             this.function = function;
         }
     }
 
-    public Promotion(Piece promotionCandidate, StackPane root) {
+    public Promotion(GraphicPiece promotionCandidate, StackPane root) {
         borderPane = new BorderPane();
         pieceSelectRibbon = new HBox();
         double size = 0.5;
@@ -155,15 +155,15 @@ public class Promotion {
         selected.setText(piece.displayName);
     }
 
-    private void selectPromotion(Piece pawn, PromotionEnum choice) {
+    private void selectPromotion(GraphicPiece pawn, PromotionEnum choice) {
         //// also is the 'close' for this 'window'
         choice.wrapper.setBackground(Background.fill(CLICKED));
         root.getChildren().removeAll(overlay, borderPane);
-        Piece piece = choice.function.apply(pawn.teamColour);
+        GraphicPiece piece = choice.function.apply(pawn.teamColour);
         // using the tile because we have the static board.
-        visualBoard[pawn.coOrds[0]][pawn.coOrds[1]].piece.deleteSprite();
-        visualBoard[pawn.coOrds[0]][pawn.coOrds[1]].deletePiece();
-        visualBoard[pawn.coOrds[0]][pawn.coOrds[1]].addNewPiece(piece, pawn.coOrds);
+        graphicBoard[pawn.coOrds[0]][pawn.coOrds[1]].piece.deleteSprite();
+        graphicBoard[pawn.coOrds[0]][pawn.coOrds[1]].deletePiece();
+        graphicBoard[pawn.coOrds[0]][pawn.coOrds[1]].addNewPiece(piece, pawn.coOrds);
 
         //// compensating for how java runs threads or something.
         //// hence why this is not called when promotion happens in GameLoop.movePiece();

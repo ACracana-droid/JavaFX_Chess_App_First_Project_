@@ -1,58 +1,35 @@
 package org.chess;
 
-import javafx.scene.paint.Color;
-import org.chess.SpecialMovePiece.SpecialProperties;
+import org.chess.SpecialProperties;
 
 public class Tile {
 
-
-    public enum ChessTileColours {
-        WHITE_BOARD(Color.ANTIQUEWHITE, Color.ORANGERED, Color.BLUE) {
-        },
-        BLACK_BOARD(Color.DARKGREEN, Color.ORANGERED, Color.BLUE) {
-        };
-
-        public final Color paint;
-        public final Color kill;
-        public final Color move;
-
-        ChessTileColours(Color colour, Color kill, Color move) {
-            this.paint = colour;
-            this.kill = kill;
-            this.move = move;
-        }
-    }
-
-
-    Piece piece;
-
+    GraphicPiece piece;
     SpecialProperties property;
-
 
     Tile() {
         property = SpecialProperties.DEFAULT;
     }
 
 
-//    public void overridePiece(Piece override) {
-//        deleteSprite();
-//        deletePiece();
-//        if (override != null) addPiece(override, override.coOrds);
-//    }
+    public void overridePiece(GraphicPiece override) {
+        deletePiece();
+        if (override != null) addPiece(override, override.coOrds);
+    }
 
-    public void addPiece(Piece newPiece, int[] coOrds) {
+    public void addPiece(GraphicPiece newPiece, int[] coOrds) {
         this.piece = newPiece;
         this.piece.setCoOrds(coOrds);
 
 //        pane.getChildren().add(piece.sprite);
     }
 
-    public void addNewPiece(Piece newPiece, int[] coOrds) {
+    public void addNewPiece(GraphicPiece newPiece, int[] coOrds) {
         this.piece = newPiece;
         this.piece.setCoOrds(coOrds);
     }
 
-    public void superficialAddPiece(Piece newPiece, int[] coOrds) {
+    public void superficialAddPiece(GraphicPiece newPiece, int[] coOrds) {
         this.piece = newPiece;
 //        this.piece.setCoOrds(coOrds);
     }
@@ -101,7 +78,7 @@ public class Tile {
     }
 
     public void deletePiece() {
-
+        piece = null;
     }
 
 }

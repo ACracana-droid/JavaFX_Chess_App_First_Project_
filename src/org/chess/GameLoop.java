@@ -5,19 +5,19 @@ import javafx.scene.layout.Background;
 import javafx.scene.layout.BackgroundFill;
 import javafx.scene.layout.CornerRadii;
 import javafx.scene.layout.StackPane;
-import org.chess.SpecialMovePiece.SpecialProperties;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import static org.chess.Pawn.getDiagonalCaptures;
 import static org.chess.TeamAttributes.*;
 
 public class GameLoop extends ChessBoard {
 
     static private TeamAttributes alliedTeam;
     static private TeamAttributes enemyTeam;
-    static private Piece lastMovedEnemyPiece = null;
+    static private GraphicPiece lastMovedEnemyPiece = null;
     static private int turnCount;
     static private List<int[]> shownMoves = null;
     static public StackPane hidden;
@@ -35,20 +35,70 @@ public class GameLoop extends ChessBoard {
     static public int[] isMove(Tile clicked) {
         if (shownMoves == null) throw new UnsupportedOperationException("NO. Should not happen!!!!");
         for (int[] move : shownMoves) {
-            if (clicked.equals(visualBoard[move[0]][move[1]])) {
+            if (clicked.equals(graphicBoard[move[0]][move[1]])) {
                 return move;
             }
         }
         return new int[]{};
     }
 
+    // legacy stuff
+    private static GraphicPiece originalPiece;
+    private static GraphicPiece nextPiece;
 
-    private static Piece originalPiece;
-    private static Piece nextPiece;
+    // modern stuff
+    private static GraphicPiece orig_piece;
+    private static GraphicPiece dest_piece;
+
+    public static void virtualMovePiece(int[] origin, int[] dest, Tile[][] board) {
+        System.out.println("MOVE!");
+
+        Tile originTile = getTile(origin, board);
+        Tile destTile = getTile(dest, board);
+        orig_piece = originTile.piece;
+        dest_piece = destTile.piece;
+
+        originTile.deletePiece();
+        originTile.deselect();
+//        orig_piece.updateNecessaryFirstMoveInfo();
+
+        if (destTile.hasPiece()) { //// must be a capture
+            System.out.println("KILL!");
+//            getAlliedTeam().capturedPieces.add(destTile.piece); // can add to display.
+//            enemyTeam.pieces.remove(destTile.piece);
+            destTile.deletePiece();
+        }
+
+        if (orig_piece.isPawn()) {
+//            if (dest[0] == alliedTeam.PROMOTION_RANK) {
+//                System.out.println("PROMOTE!!");
+//                new Promotion(orig_piece, root);
+//                //// function will call updateGameLoop() - it must in order to compensate for how java runs threads.
+////                lastMovedEnemyPiece = orig_piece;
+//                return;
+//            }
+            if (destTile.isEnPassant()) {
+                System.out.println("EN PASSANT!!!!");
+                GraphicPiece passedPiece = getTile(lastMovedEnemyPiece.coOrds, board).piece;
+//                getAlliedTeam().capturedPieces.add(passedPiece);
+//                enemyTeam.pieces.remove(passedPiece);
+                getTile(lastMovedEnemyPiece.coOrds, board).deletePiece();
+            }
+        }
+    }
+
+    public static void undoMovePiece(Tile[][] board) { // eh
+        getTile(orig_piece.coOrds, board).addPiece(orig_piece, orig_piece.coOrds);
+
+        if (orig_piece.isPawn() && dest_piece != null && getTile(dest_piece.coOrds, board).isEnPassant()) {
+            getTile(lastMovedEnemyPiece.coOrds, board).addPiece(lastMovedEnemyPiece, lastMovedEnemyPiece.coOrds);
+        } else if (dest_piece != null) getTile(dest_piece.coOrds, board).addPiece(dest_piece, dest_piece.coOrds);
+    }
+
 
     static public void movePiece(Tile originalLocation, Tile nextLocation, int[] nextCoOrds) {
         System.out.println("MOVE!");
-        Piece piece = originalLocation.piece;
+        GraphicPiece piece = originalLocation.piece;
         originalLocation.deletePiece();
         originalLocation.deselect();
         piece.updateNecessaryFirstMoveInfo();
@@ -74,7 +124,7 @@ public class GameLoop extends ChessBoard {
             }
             if (nextLocation.isEnPassant()) {
                 System.out.println("EN PASSANT!!!!");
-                Piece passedPiece = getVisualTile(lastMovedEnemyPiece.coOrds).piece;
+                GraphicPiece passedPiece = getVisualTile(lastMovedEnemyPiece.coOrds).piece;
                 getAlliedTeam().capturedPieces.add(passedPiece);
                 enemyTeam.pieces.remove(passedPiece);
 
@@ -86,6 +136,29 @@ public class GameLoop extends ChessBoard {
 
         updateGameLoop();
         lastMovedEnemyPiece = piece;
+    }
+
+    /// shouldn't be graphic but alas.
+    public static boolean isThreatToKing(List<GraphicPiece> enemyTeam, int[] kingCoOrds, Tile[][] board) {
+        for (GraphicPiece piece : enemyTeam) {
+            if (piece.isPawn()) {
+                for (int[] move : getDiagonalCaptures((Pawn) piece, board)) {
+                    if (move[0] == kingCoOrds[0] && move[1] == kingCoOrds[1]) {
+                        System.out.println("King: ahh~ stop threatening me");
+                        return true;
+                    }
+                }
+            } else {
+                for (int[] move : piece.moves(board)) {
+                    if (move[0] == kingCoOrds[0] && move[1] == kingCoOrds[1]) {
+                        System.out.println("King: ahh~ stop threatening me");
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 
 //    static public List<int[]> removeMoveIfResultsInCheck(Tile origin, List<int[]> moves) {
@@ -141,7 +214,7 @@ public class GameLoop extends ChessBoard {
         System.out.println("showing moves: ");
 
         for (int[] move : moves) {
-            visualBoard[move[0]][move[1]].showStandardLocationHighlight();
+            graphicBoard[move[0]][move[1]].showStandardLocationHighlight();
             System.out.println(Arrays.toString(move));
         }
         shownMoves = moves;
@@ -149,32 +222,32 @@ public class GameLoop extends ChessBoard {
         //// List must be tracked so moves can be hidden.
     }
 
-    static public void showMoves(List<int[]> moves, SpecialProperties property) {
-        switch (property) {
-            case PROMOTABLE:
-                for (int[] move : moves) {
-                    if (move[0] == alliedTeam.PROMOTION_RANK) {
-                        visualBoard[move[0]][move[1]].showPromotionHighlight();
-                    } else {
-                        visualBoard[move[0]][move[1]].showStandardLocationHighlight();
-                    }
-                    System.out.println(Arrays.toString(move));
-                }
-                shownMoves = moves;
-                break;
-            case CHECK_AND_MATE:
-
-                break;
-            default:
-                showMoves(moves);
-        }
-    }
+//    static public void showMoves(List<int[]> moves, SpecialProperties property) {
+//        switch (property) {
+//            case PROMOTABLE:
+//                for (int[] move : moves) {
+//                    if (move[0] == alliedTeam.PROMOTION_RANK) {
+//                        graphicBoard[move[0]][move[1]].showPromotionHighlight();
+//                    } else {
+//                        graphicBoard[move[0]][move[1]].showStandardLocationHighlight();
+//                    }
+//                    System.out.println(Arrays.toString(move));
+//                }
+//                shownMoves = moves;
+//                break;
+//            case CHECK_AND_MATE:
+//
+//                break;
+//            default:
+//                showMoves(moves);
+//        }
+//    }
 
 
     static public void hideMoves() {
         if (shownMoves == null) return; //// no visible moves to hide
         for (int[] move : shownMoves) {
-            visualBoard[move[0]][move[1]].clearTileToNormalState();
+            graphicBoard[move[0]][move[1]].clearTileToNormalState();
         }
     }
 
@@ -228,10 +301,10 @@ public class GameLoop extends ChessBoard {
 
     static public List<int[]> removeMoveIfNotValid(Tile origTile, List<int[]> moves) {
         if (validMoves == null) return moves;
-        int[] origcoOrds = origTile.piece.coOrds;
+        int[] origin = origTile.piece.coOrds;
         List<int[]> ls = new ArrayList<>();
         for (int[][] moveBundle : validMoves) {
-            if (Arrays.equals(moveBundle[0], origcoOrds)) {
+            if (Arrays.equals(moveBundle[0], origin)) {
                 ls.add(moveBundle[1]);
             }
         }
@@ -256,7 +329,8 @@ public class GameLoop extends ChessBoard {
 //                }
 //            } else {
 //                for (int[] move : piece.moves(visualBoard)) {
-////                    virtualBoard[move[0]][move[1]].pane.setBackground(Background.fill(Color.RED));
+
+    /// /                    virtualBoard[move[0]][move[1]].pane.setBackground(Background.fill(Color.RED));
 //
 //                    if (move[0] == enemyKing.coOrds[0] && move[1] == enemyKing.coOrds[1]) {
 //
@@ -292,23 +366,13 @@ public class GameLoop extends ChessBoard {
 //        System.out.println("THIS IS MATE!!!");
 //        return true;
 //    }
-
-
-    private static Tile getVisualTile(Piece piece) {
-        return getVisualTile(piece.coOrds);
-    }
-
-    private static List<int[]> getAllCaptureMoves(List<Piece> pieceList) {
+    private static List<int[]> getAllCaptureMoves(List<GraphicPiece> pieceList) {
         List<int[]> ls = new ArrayList<>();
-        for (Piece piece : pieceList) {
+        for (GraphicPiece piece : pieceList) {
             if (piece.isPawn()) { // different because some moves do not capture
-                for (int[] move : Pawn.getDiagonalCaptures((Pawn) piece)) {
-                    ls.add(move);
-                }
+                ls.addAll(getDiagonalCaptures((Pawn) piece, virtualBoard));
             } else {
-                for (int[] move : piece.moves(visualBoard)) {
-                    ls.add(move);
-                }
+                ls.addAll(piece.moves(graphicBoard));
             }
         }
         return ls;
@@ -319,25 +383,35 @@ public class GameLoop extends ChessBoard {
         return alliedTeam;
     }
 
-    public static Piece getPrevEnemyPiece() {
+    static public TeamAttributes getEnemyTeam() {
+        return enemyTeam;
+    }
+
+    public static GraphicPiece getPrevEnemyPiece() {
         return lastMovedEnemyPiece;
     }
 
     public static boolean isEnPassantValid(int[] alliedPawnOrigin) {
         if (lastMovedEnemyPiece == null) return false;
 
-        if (lastMovedEnemyPiece.isPawn()
+        //// EN PASSANT!
+        return lastMovedEnemyPiece.isPawn()
                 && getVisualTile(lastMovedEnemyPiece.coOrds).isProperty(SpecialProperties.PAWN_DOUBLE_STEP)
                 && alliedPawnOrigin[0] == lastMovedEnemyPiece.coOrds[0]
-                && Math.abs(alliedPawnOrigin[1] - lastMovedEnemyPiece.coOrds[1]) == 1
-        ) {
-            //// EN PASSANT!
-            return true; // when this happens, the condition PAWN_DOUBLE_STEP is permanently impossible to get. removed.
-        }
-        return false;
+                && Math.abs(alliedPawnOrigin[1] - lastMovedEnemyPiece.coOrds[1]) == 1; // when this happens, the condition PAWN_DOUBLE_STEP is permanently impossible to get. removed.
     }
 
     public static VisualTile getVisualTile(int[] coOrds) {
-        return visualBoard[coOrds[0]][coOrds[1]];
+        return graphicBoard[coOrds[0]][coOrds[1]];
     }
+
+    public static VisualTile getVisualTile(GraphicPiece piece) {
+        return graphicBoard[piece.coOrds[0]][piece.coOrds[1]];
+    }
+
+    public static Tile getTile(int[] coOrds, Tile[][] board) {
+        return board[coOrds[0]][coOrds[1]];
+    }
+
+
 }

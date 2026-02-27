@@ -13,14 +13,14 @@ public enum TeamAttributes {
             Color.DARKGREEN, "Black's\nTurn") {
     };
 
-    public final List<Piece> pieces;
-    public final List<Piece> capturedPieces;
+    public final List<GraphicPiece> pieces;
+    public final List<GraphicPiece> capturedPieces;
     public final int PROMOTION_RANK;
     public final Color paint;
     public final String turnLabelText;
     public King king;
 
-    TeamAttributes(List<Piece> ls, List<Piece> ls1, int PROMOTION_RANK, Color paint, String turnLabelText) {
+    TeamAttributes(List<GraphicPiece> ls, List<GraphicPiece> ls1, int PROMOTION_RANK, Color paint, String turnLabelText) {
         king = null;
         this.pieces = new ArrayList<>();
         this.capturedPieces = new ArrayList<>();

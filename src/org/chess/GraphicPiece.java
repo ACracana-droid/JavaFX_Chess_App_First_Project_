@@ -6,24 +6,37 @@ import javafx.scene.image.ImageView;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 import static org.chess.ChessBoard.BOARD_SIZE;
-import static org.chess.ChessBoard.visualBoard;
+import static org.chess.ChessBoard.graphicBoard;
 import static org.chess.GameLoop.*;
 import static org.chess.Queen.QUEEN_MOVE_VECTORS;
 import static org.chess.TeamAttributes.*;
 
-
-public abstract class Piece {
+abstract class BasePiece {
     char id;
     int[] coOrds;
-    ImageView sprite;
     TeamAttributes teamColour;
 
-    Piece(TeamAttributes colour) {
+    BasePiece(TeamAttributes colour) {
         this.teamColour = colour;
-        colour.pieces.add(this);
+    }
 
+    BasePiece(TeamAttributes colour, int[] coOrds) {
+        this.teamColour = colour;
+        this.coOrds = coOrds;
+    }
+
+}
+
+public abstract class GraphicPiece extends BasePiece {
+
+    ImageView sprite;
+
+    GraphicPiece(TeamAttributes colour) {
+        super(colour);
+        colour.pieces.add(this);
     }
 
     public boolean isPawn() {
@@ -38,21 +51,21 @@ public abstract class Piece {
     abstract public List<int[]> moves(Tile[][] virtualBoard);
 
 
-    protected List<int[]> infiniteDistancePieceMove(Tile[][] virtualBoard, int[][] moveVectors) {
+    protected List<int[]> infiniteDistancePieceMove(Tile[][] board, int[][] moveVectors) {
         List<int[]> ls = new ArrayList<>();
         for (int[] vector : moveVectors) {
             int row = coOrds[0] + vector[0], col = coOrds[1] + vector[1];
             int xLimit = vector[0] == 1 ? BOARD_SIZE : -1;
             int yLimit = vector[1] == 1 ? BOARD_SIZE : -1;
             while (row != xLimit && col != yLimit) {
-                if (virtualBoard[row][col].hasPiece())
+                if (board[row][col].hasPiece())
                     break;
                 ls.add(new int[]{row, col});
                 row += vector[0];
                 col += vector[1];
             }
             if (row != xLimit && col != yLimit) {
-                if (virtualBoard[row][col].hasEnemyPiece()) {
+                if (board[row][col].hasEnemyPiece()) {
                     ls.add(new int[]{row, col});
                 } // otherwise it is an ally and a move is not allowed.
             }
@@ -62,9 +75,9 @@ public abstract class Piece {
 
 
     public ImageView getImageView(String partialFileName) {
-        Image image = new Image(getClass().getResource("/images/"
+        Image image = new Image(Objects.requireNonNull(getClass().getResource("/images/"
                 + (teamColour == WHITE_TEAM ? "w" : "b")
-                + partialFileName).toExternalForm());
+                + partialFileName)).toExternalForm());
         ImageView imageView = new ImageView(image);
 
         imageView.setPreserveRatio(true);
@@ -82,7 +95,7 @@ public abstract class Piece {
 
     protected static boolean isValidCoOrd(int rank, int file, TeamAttributes colour) {
         return !(rank < 0 || rank >= BOARD_SIZE || file < 0 || file >= BOARD_SIZE)
-                && (!visualBoard[rank][file].hasTeamOfThisColour(colour));
+                && (!graphicBoard[rank][file].hasTeamOfThisColour(colour));
     }
 
     public void updateNecessaryFirstMoveInfo() {
@@ -93,8 +106,7 @@ public abstract class Piece {
     }
 
     public String toString() {
-        String s = teamColour.name() + " " + id;
-        return s;
+        return teamColour.name() + " " + id;
     }
 
     public void deleteSprite() {
@@ -107,13 +119,13 @@ public abstract class Piece {
 }
 
 
-class King extends SpecialMovePiece {
+class King extends GraphicPiece implements SpecialMovePiece {
 
     King(TeamAttributes colour) {
         super(colour);
         this.id = 'K';
         this.sprite = getImageView("-king.png");
-        this.property = SpecialProperties.CHECK_AND_MATE;
+//        this.property = SpecialProperties.CHECK_AND_MATE;
     }
 
     @Override
@@ -122,7 +134,7 @@ class King extends SpecialMovePiece {
     }
 
     @Override
-    public List<int[]> moves(Tile[][] virtualBoard) {
+    public List<int[]> moves(Tile[][] board) {
         List<int[]> ls = new ArrayList<>();
         int i = coOrds[0], j = coOrds[1];
 
@@ -142,7 +154,7 @@ class King extends SpecialMovePiece {
 }
 
 
-class Queen extends Piece {
+class Queen extends GraphicPiece {
 
     Queen(TeamAttributes colour) {
         super(colour);
@@ -165,20 +177,20 @@ class Queen extends Piece {
 
 
     @Override
-    public List<int[]> moves(Tile[][] virtualBoard) {
-        return infiniteDistancePieceMove(virtualBoard, QUEEN_MOVE_VECTORS);
+    public List<int[]> moves(Tile[][] board) {
+        return infiniteDistancePieceMove(board, QUEEN_MOVE_VECTORS);
     }
 
 }
 
-class Rook extends SpecialMovePiece {
+class Rook extends GraphicPiece implements SpecialMovePiece {
 
 
     Rook(TeamAttributes colour) {
         super(colour);
         this.id = 'R';
         this.sprite = getImageView("-rook.png");
-        this.property = SpecialProperties.CASTLE;
+//        this.property = SpecialProperties.CASTLE;
     }
 
     private final int[][] moveVectors = {
@@ -190,14 +202,14 @@ class Rook extends SpecialMovePiece {
 
 
     @Override
-    public List<int[]> moves(Tile[][] virtualBoard) {
-        return infiniteDistancePieceMove(virtualBoard, moveVectors);
+    public List<int[]> moves(Tile[][] board) {
+        return infiniteDistancePieceMove(board, moveVectors);
     }
 
 
 }
 
-class Knight extends Piece {
+class Knight extends GraphicPiece {
 
     Knight(TeamAttributes colour) {
         super(colour);
@@ -218,7 +230,7 @@ class Knight extends Piece {
 
     /// / for a knight, this is easier. All moves are always legal if within bounds and not hitting an allied piece.
     @Override
-    public List<int[]> moves(Tile[][] virtualBoard) {
+    public List<int[]> moves(Tile[][] board) {
         int i = coOrds[0], j = coOrds[1];
         List<int[]> ls = new ArrayList<>();
 
@@ -234,7 +246,7 @@ class Knight extends Piece {
 
 }
 
-class Bishop extends Piece {
+class Bishop extends GraphicPiece {
     private final int[][] moveVectors = {
             {1, 1},
             {1, -1},
@@ -255,36 +267,36 @@ class Bishop extends Piece {
     }
 }
 
-class Pawn extends SpecialMovePiece {
+class Pawn extends GraphicPiece implements SpecialMovePiece {
 
 
     Pawn(TeamAttributes colour) {
         super(colour);
         this.id = 'p';
         this.sprite = getImageView("-pawn.png");
-        this.property = SpecialProperties.PROMOTABLE;
+//        this.property = SpecialProperties.PROMOTABLE;
     }
 
     final int moveVector = (teamColour.equals(WHITE_TEAM) ? 1 : -1);
     final int limit = (teamColour.equals(WHITE_TEAM) ? BOARD_SIZE : -1);
 
     @Override
-    public List<int[]> moves(Tile[][] virtualBoard) {
+    public List<int[]> moves(Tile[][] board) {
         List<int[]> ls = new ArrayList<>();
 
         int row = coOrds[0] + moveVector;
 
         if (row == limit) return ls;
-        diagonalCaptures(ls, row, false);
+        diagonalCaptures(ls, row, false, board);
         int col;
         if (GameLoop.isEnPassantValid(coOrds))
-            ls.add(enPassant());
+            ls.add(enPassant(board));
 
         col = coOrds[1];
-        if (!virtualBoard[row][col].hasPiece()) {
+        if (!board[row][col].hasPiece()) {
             ls.add(new int[]{row, col});
             if (firstMove) {
-                pawnDoubleStepMove(ls);
+                pawnDoubleStepMove(ls, board);
             }
         }
 
@@ -293,36 +305,36 @@ class Pawn extends SpecialMovePiece {
         return ls;
     }
 
-    private void diagonalCaptures(List<int[]> ls, int row, boolean ignoreIsMovePossible) {
+    private void diagonalCaptures(List<int[]> ls, int row, boolean ignoreIsMovePossible, Tile[][] board) {
         //// Pawn's two diagonal capture moves:
         int col = coOrds[1] - 1;
         if (col > -1) {
-            if (visualBoard[row][col].hasEnemyPiece() || ignoreIsMovePossible) {
+            if (board[row][col].hasEnemyPiece() || ignoreIsMovePossible) {
                 ls.add(new int[]{row, col});
             }
         }
         col = coOrds[1] + 1;
         if (col < BOARD_SIZE) {
-            if (visualBoard[row][col].hasEnemyPiece() || ignoreIsMovePossible) {
+            if (board[row][col].hasEnemyPiece() || ignoreIsMovePossible) {
                 ls.add(new int[]{row, col});
             }
         }
     }
 
-    public static List<int[]> getDiagonalCaptures(Pawn piece) {
+    public static List<int[]> getDiagonalCaptures(Pawn piece, Tile[][] board) {
         List<int[]> ls = new ArrayList<>();
         if (piece.coOrds[0] + piece.moveVector == piece.limit) {
             System.out.println("There can't be a pawn here!!");
             return ls;
         }
-        piece.diagonalCaptures(ls, piece.coOrds[0] + piece.moveVector, true);
+        piece.diagonalCaptures(ls, piece.coOrds[0] + piece.moveVector, true, board);
         return ls;
 
     }
 
-    private int[] enPassant() {
-        Piece captureInPassing = getPrevEnemyPiece();
-        visualBoard[captureInPassing.coOrds[0] + this.moveVector][captureInPassing.coOrds[1]].setIsEnPassant();
+    private int[] enPassant(Tile[][] board) {
+        GraphicPiece captureInPassing = getPrevEnemyPiece();
+        board[captureInPassing.coOrds[0] + this.moveVector][captureInPassing.coOrds[1]].setIsEnPassant();
         return new int[]{captureInPassing.coOrds[0] + moveVector, captureInPassing.coOrds[1]};
     }
 
@@ -332,12 +344,12 @@ class Pawn extends SpecialMovePiece {
     }
 
 
-    private void pawnDoubleStepMove(List<int[]> ls) {
+    private void pawnDoubleStepMove(List<int[]> ls, Tile[][] board) {
         int row = coOrds[0] + moveVector;
         int col = coOrds[1]; // don't worry about edge cases, it can only do this for one square.
-        if (!visualBoard[row][col].hasPiece()
-                && !visualBoard[row += moveVector][col].hasPiece()) {
-            visualBoard[row][col].setProperty(SpecialProperties.PAWN_DOUBLE_STEP);
+        if (!board[row][col].hasPiece()
+                && !board[row += moveVector][col].hasPiece()) {
+            board[row][col].setProperty(SpecialProperties.PAWN_DOUBLE_STEP);
             ls.add(new int[]{row, col});
         }
     }
