@@ -8,7 +8,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.chess.ChessBoard.BOARD_SIZE;
-import static org.chess.ChessBoard.boardArray;
+import static org.chess.ChessBoard.visualBoard;
 import static org.chess.GameLoop.*;
 import static org.chess.Queen.QUEEN_MOVE_VECTORS;
 import static org.chess.TeamAttributes.*;
@@ -80,9 +80,9 @@ public abstract class Piece {
     }
 
 
-    private boolean isValidCoOrd(int x, int y) { //eh. Services knight.
-        return !(x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE)
-                && (!boardArray[x][y].hasAlliedTeam());
+    protected static boolean isValidCoOrd(int rank, int file, TeamAttributes colour) {
+        return !(rank < 0 || rank >= BOARD_SIZE || file < 0 || file >= BOARD_SIZE)
+                && (!visualBoard[rank][file].hasTeamOfThisColour(colour));
     }
 
     public void updateNecessaryFirstMoveInfo() {
@@ -98,7 +98,7 @@ public abstract class Piece {
     }
 
     public void deleteSprite() {
-        getBoardTile(coOrds).deletePiece();
+        getVisualTile(coOrds).deletePiece();
     }
 
     public void setCoOrds(int[] coOrds) {
@@ -124,19 +124,15 @@ class King extends SpecialMovePiece {
     @Override
     public List<int[]> moves(Tile[][] virtualBoard) {
         List<int[]> ls = new ArrayList<>();
+        int i = coOrds[0], j = coOrds[1];
 
         for (int[] move : QUEEN_MOVE_VECTORS) {
-            int i = coOrds[0], j = coOrds[1];
 
             int rank = i + move[0];
             int file = j + move[1];
-            if (!(rank < 0 || rank >= BOARD_SIZE || file < 0 || file >= BOARD_SIZE)) {
-                if (!virtualBoard[rank][file].hasTeamOfThisColour(teamColour)) {
-
-                    ls.add(new int[]{rank, file});
-                    System.out.println("king move: " + Arrays.toString(ls.getLast()));
-                }
-
+            if (isValidCoOrd(rank, file, teamColour)) {
+                ls.add(new int[]{rank, file});
+                System.out.println("king move: " + Arrays.toString(ls.getLast()));
             }
         }
 
@@ -227,12 +223,10 @@ class Knight extends Piece {
         List<int[]> ls = new ArrayList<>();
 
         for (int[] move : moveVectors) {
-            int x = i + move[0];
-            int y = j + move[1];
-            if (!(x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE)) { /// factor this out.
-                if (!virtualBoard[x][y].hasAlliedTeam())
-                    ls.add(new int[]{x, y}); // valid location.
-            }
+            int rank = i + move[0];
+            int file = j + move[1];
+            if (isValidCoOrd(rank, file, teamColour))
+                ls.add(new int[]{rank, file}); // valid location.
         }
 
         return ls;
@@ -303,13 +297,13 @@ class Pawn extends SpecialMovePiece {
         //// Pawn's two diagonal capture moves:
         int col = coOrds[1] - 1;
         if (col > -1) {
-            if (boardArray[row][col].hasEnemyPiece() || ignoreIsMovePossible) {
+            if (visualBoard[row][col].hasEnemyPiece() || ignoreIsMovePossible) {
                 ls.add(new int[]{row, col});
             }
         }
         col = coOrds[1] + 1;
         if (col < BOARD_SIZE) {
-            if (boardArray[row][col].hasEnemyPiece() || ignoreIsMovePossible) {
+            if (visualBoard[row][col].hasEnemyPiece() || ignoreIsMovePossible) {
                 ls.add(new int[]{row, col});
             }
         }
@@ -328,7 +322,7 @@ class Pawn extends SpecialMovePiece {
 
     private int[] enPassant() {
         Piece captureInPassing = getPrevEnemyPiece();
-        boardArray[captureInPassing.coOrds[0] + this.moveVector][captureInPassing.coOrds[1]].setIsEnPassant();
+        visualBoard[captureInPassing.coOrds[0] + this.moveVector][captureInPassing.coOrds[1]].setIsEnPassant();
         return new int[]{captureInPassing.coOrds[0] + moveVector, captureInPassing.coOrds[1]};
     }
 
@@ -341,9 +335,9 @@ class Pawn extends SpecialMovePiece {
     private void pawnDoubleStepMove(List<int[]> ls) {
         int row = coOrds[0] + moveVector;
         int col = coOrds[1]; // don't worry about edge cases, it can only do this for one square.
-        if (!boardArray[row][col].hasPiece()
-                && !boardArray[row += moveVector][col].hasPiece()) {
-            boardArray[row][col].setProperty(SpecialProperties.PAWN_DOUBLE_STEP);
+        if (!visualBoard[row][col].hasPiece()
+                && !visualBoard[row += moveVector][col].hasPiece()) {
+            visualBoard[row][col].setProperty(SpecialProperties.PAWN_DOUBLE_STEP);
             ls.add(new int[]{row, col});
         }
     }

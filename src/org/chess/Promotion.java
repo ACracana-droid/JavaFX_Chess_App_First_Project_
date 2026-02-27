@@ -13,7 +13,7 @@ import javafx.scene.shape.Rectangle;
 import java.util.function.Function;
 
 import static org.chess.ChessBoard.root;
-import static org.chess.ChessBoard.boardArray;
+import static org.chess.ChessBoard.visualBoard;
 import static org.chess.GameLoop.updateGameLoop;
 import static org.chess.TeamAttributes.BLACK_TEAM;
 import static org.chess.TeamAttributes.WHITE_TEAM;
@@ -161,9 +161,9 @@ public class Promotion {
         root.getChildren().removeAll(overlay, borderPane);
         Piece piece = choice.function.apply(pawn.teamColour);
         // using the tile because we have the static board.
-        boardArray[pawn.coOrds[0]][pawn.coOrds[1]].piece.deleteSprite();
-        boardArray[pawn.coOrds[0]][pawn.coOrds[1]].deletePiece();
-        boardArray[pawn.coOrds[0]][pawn.coOrds[1]].addNewPiece(piece, pawn.coOrds);
+        visualBoard[pawn.coOrds[0]][pawn.coOrds[1]].piece.deleteSprite();
+        visualBoard[pawn.coOrds[0]][pawn.coOrds[1]].deletePiece();
+        visualBoard[pawn.coOrds[0]][pawn.coOrds[1]].addNewPiece(piece, pawn.coOrds);
 
         //// compensating for how java runs threads or something.
         //// hence why this is not called when promotion happens in GameLoop.movePiece();
