@@ -1,0 +1,81 @@
+.root {
+-white-turn: whitesmoke;
+-black-turn: darkgray;
+-light-tile: antiquewhite;
+-dark-tile: gray;
+-move-tile: blue;
+-capture-tile: red;
+
+-fx-background-color: beige;
+-fx-padding: 5;
+}
+
+.info-wrapper {
+-fx-spacing: 20;
+-fx-padding: 10;
+}
+
+.turn-counter-label {
+-fx-font-family: "Times New Roman";
+-fx-padding: 10;
+-fx-font-size: 30;
+-fx-background-color: antiquewhite;
+-fx-border-size: 5;
+-fx-border-color: black;
+}
+
+.board-view {
+-fx-border-width: 12;
+-fx-border-color: black;
+-fx-background-color: white;
+}
+
+.board-view:light {
+-fx-background-color: -white-turn;
+-fx-corner-radius: 20;
+}
+
+.board-view:dark {
+-fx-background-color: -black-turn;
+-fx-corner-radius: 20;
+}
+
+.chess-axis {
+-fx-font-family: "Times New Roman", Times, serif;
+-fx-font-weight: bold
+}
+
+.chessboard-background {
+ -fx-background-color: gray;
+}
+
+.chess-tile {
+}
+
+.tile-light {
+-fx-background-color: -light-tile;
+}
+
+.tile-dark {
+-fx-background-color: -dark-tile;
+}
+
+.chess-tile:move{
+-fx-background-color: -move-tile;
+}
+
+.chess-tile:capture {
+-fx-background-color: -capture-tile;
+}
+
+
+.promotion-image {
+  -fx-margin: 5;
+-fx-border-color: black;
+ -fx-border-width: 8;
+}
+
+.promotion-pane {
+
+  }
+

@@ -14,6 +14,7 @@ import java.util.function.Function;
 
 import static org.chess.ChessBoard.root;
 import static org.chess.ChessBoard.graphicBoard;
+import static org.chess.GameLoop.getTile;
 import static org.chess.GameLoop.updateGameLoop;
 import static org.chess.TeamAttributes.BLACK_TEAM;
 import static org.chess.TeamAttributes.WHITE_TEAM;
@@ -38,16 +39,16 @@ public class Promotion {
 
         // This is the only thing a little bit beyond my means. It is like a Lambda function.
         // It can call the constructor of the class. Hence, 'new'.
-        public final Function<TeamAttributes, GraphicPiece> function;
+        public final Function<TeamAttributes, Piece> function;
 
-        PromotionEnum(String displayName, String partialFileName, Function<TeamAttributes, GraphicPiece> function) {
+        PromotionEnum(String displayName, String partialFileName, Function<TeamAttributes, Piece> function) {
             this.displayName = displayName;
             this.partialFileName = partialFileName;
             this.function = function;
         }
     }
 
-    public Promotion(GraphicPiece promotionCandidate, StackPane root) {
+    public Promotion(Piece promotionCandidate, StackPane root) {
         borderPane = new BorderPane();
         pieceSelectRibbon = new HBox();
         double size = 0.5;
@@ -74,37 +75,23 @@ public class Promotion {
             piece.wrapper.setOnMouseClicked(mouseEvent -> selectPromotion(promotionCandidate, piece));
 
             piece.wrapper.getChildren().add(piece.view);
-            piece.wrapper.setStyle("""
-                    -fx-margin: 5;
-                    -fx-border-color: black;
-                    -fx-border-width: 8;
-                    """);
+            piece.wrapper.getStyleClass().add("promotion-image");
             pieceSelectRibbon.getChildren().add(piece.wrapper);
         }
 
         pieceSelectRibbon.setAlignment(Pos.CENTER);
-        pieceSelectRibbon.setStyle("""
-                -fx-padding: 10;
-                """);
+        pieceSelectRibbon.getStyleClass().add("info-wrapper");
         pieceSelectRibbon.prefHeightProperty().bind(borderPane.heightProperty().multiply(size));
         pieceSelectRibbon.prefWidthProperty().bind(borderPane.widthProperty().multiply(size));
 
-        borderPane.setStyle("""
-                -fx-margin: 10;
-                -fx-border-width: 5;
-                -fx-border-color: black;
-                -fx-border-radius: 18;
-                """);
-        borderPane.setBackground(new Background(new BackgroundFill(
-                promotionCandidate.teamColour.paint, new CornerRadii(20), Insets.EMPTY)));
+        borderPane.getStyleClass().add("board-view");
+        borderPane.getStyleClass().add("promotion-pane");
+//        borderPane.setBackground(new Background(new BackgroundFill(
+//                promotionCandidate.teamColour.paint, new CornerRadii(20), Insets.EMPTY)));
         borderPane.setPadding(new Insets(10)); //does spacing
-
-        Color contrastTeamColor = promotionCandidate.teamColour.paint.equals(WHITE_TEAM.paint) ?
-                BLACK_TEAM.paint : WHITE_TEAM.paint;
 
         selected = new Label();
         selected.setAlignment(Pos.CENTER);
-        selected.setTextFill(contrastTeamColor);
         StackPane selectedWrap = new StackPane();
         selectedWrap.getChildren().add(selected);
         borderPane.setBottom(selectedWrap);
@@ -114,7 +101,6 @@ public class Promotion {
                 -fx-font-size: 17;
                 """);
 
-        info.setTextFill(contrastTeamColor);
         StackPane wrapInfo = new StackPane();
         wrapInfo.getChildren().add(info);
 
@@ -155,15 +141,18 @@ public class Promotion {
         selected.setText(piece.displayName);
     }
 
-    private void selectPromotion(GraphicPiece pawn, PromotionEnum choice) {
+    private void selectPromotion(Piece pawn, PromotionEnum choice) {
         //// also is the 'close' for this 'window'
         choice.wrapper.setBackground(Background.fill(CLICKED));
         root.getChildren().removeAll(overlay, borderPane);
-        GraphicPiece piece = choice.function.apply(pawn.teamColour);
-        // using the tile because we have the static board.
-        graphicBoard[pawn.coOrds[0]][pawn.coOrds[1]].piece.deleteSprite();
-        graphicBoard[pawn.coOrds[0]][pawn.coOrds[1]].deletePiece();
-        graphicBoard[pawn.coOrds[0]][pawn.coOrds[1]].addNewPiece(piece, pawn.coOrds);
+
+        TeamAttributes colour = pawn.teamColour;
+
+        Piece piece = choice.function.apply(colour);
+        getTile(pawn.coOrds, graphicBoard).deletePiece();
+        colour.pieces.remove(pawn);
+        colour.pieces.add(piece);
+        getTile(pawn.coOrds, graphicBoard).addNewPiece(piece, pawn.coOrds);
 
         //// compensating for how java runs threads or something.
         //// hence why this is not called when promotion happens in GameLoop.movePiece();

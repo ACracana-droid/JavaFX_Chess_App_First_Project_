@@ -1,37 +1,79 @@
 package org.chess;
 
-import org.chess.SpecialProperties;
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.chess.ChessBoard.*;
+import static org.chess.ChessBoard.resetVirtualBoardToGraphicState;
+import static org.chess.ChessBoard.virtualBoard;
+import static org.chess.GameLoop.*;
+import static org.chess.GameLoop.getAlliedTeam;
 
 public class Tile {
 
-    GraphicPiece piece;
+    Piece piece;
     SpecialProperties property;
 
-    Tile() {
-        property = SpecialProperties.DEFAULT;
-    }
+//    Tile() {
+//        property = SpecialProperties.DEFAULT;
+//    }
 
 
-    public void overridePiece(GraphicPiece override) {
+    public void overridePiece(Piece override) {
         deletePiece();
         if (override != null) addPiece(override, override.coOrds);
     }
 
-    public void addPiece(GraphicPiece newPiece, int[] coOrds) {
+    static Tile getTileCopy(Tile tile, int i, int j) {
+        Tile copy = new Tile();
+        if (tile.hasPiece()) {
+            copy.addNewPiece(tile.piece, new int[]{i, j});
+            if (tile.property != null) {
+                copy.setProperty(tile.property);
+            }
+        }
+        return copy;
+    }
+
+    public void addPiece(Piece newPiece, int[] coOrds) {
         this.piece = newPiece;
         this.piece.setCoOrds(coOrds);
 
 //        pane.getChildren().add(piece.sprite);
     }
 
-    public void addNewPiece(GraphicPiece newPiece, int[] coOrds) {
+    public void addNewPiece(Piece newPiece, int[] coOrds) {
         this.piece = newPiece;
         this.piece.setCoOrds(coOrds);
     }
 
-    public void superficialAddPiece(GraphicPiece newPiece, int[] coOrds) {
+    public void addNewPiece(Piece newPiece, Move move) {
         this.piece = newPiece;
-//        this.piece.setCoOrds(coOrds);
+        this.piece.setCoOrds(move.getCoOrds());
+    }
+
+    public List<Move> getValidMoves(int[] origin) {
+        List<Move> moves = this.piece.moves(graphicBoard);
+        List<Move> validMoves = new ArrayList<>();
+        if (this.piece.equals(getAlliedTeam().king)) {
+            for (Move move : moves) {
+                List<Piece> virtualEnemyList = GameLoop.virtualMovePiece(origin, move, virtualBoard);
+                if (isNotThreatToKing(virtualEnemyList, move.getCoOrds(), virtualBoard)) {
+                    validMoves.add(move);
+                }
+                resetVirtualBoardToGraphicState();
+            }
+
+        } else {
+            for (Move move : moves) {
+                List<Piece> virtualEnemyList = GameLoop.virtualMovePiece(origin, move, virtualBoard);
+                if (isNotThreatToKing(virtualEnemyList, getAlliedTeam().king.coOrds, virtualBoard)) {
+                    validMoves.add(move);
+                }
+                resetVirtualBoardToGraphicState();
+            }
+        }
+        return validMoves;
     }
 
 
@@ -56,14 +98,6 @@ public class Tile {
         return hasPiece() && !piece.teamColour.equals(GameLoop.getAlliedTeam());
     }
 
-
-    public boolean isEnPassant() {
-        return property.equals(SpecialProperties.EN_PASSANT);
-    }
-
-    public void setIsEnPassant() {
-        property = SpecialProperties.EN_PASSANT;
-    }
 
     public boolean isProperty(SpecialProperties property) {
         return this.property.equals(property);
