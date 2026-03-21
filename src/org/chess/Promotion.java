@@ -12,12 +12,10 @@ import javafx.scene.shape.Rectangle;
 
 import java.util.function.Function;
 
-import static org.chess.ChessBoard.root;
+import static org.chess.ChessBoard.boardRoot;
 import static org.chess.ChessBoard.graphicBoard;
-import static org.chess.GameLoop.getTile;
-import static org.chess.GameLoop.updateGameLoop;
-import static org.chess.TeamAttributes.BLACK_TEAM;
-import static org.chess.TeamAttributes.WHITE_TEAM;
+import static org.chess.ChessLoop.getTile;
+import static org.chess.ChessLoop.updateGameLoop;
 
 
 public class Promotion {
@@ -39,9 +37,9 @@ public class Promotion {
 
         // This is the only thing a little bit beyond my means. It is like a Lambda function.
         // It can call the constructor of the class. Hence, 'new'.
-        public final Function<TeamAttributes, Piece> function;
+        public final Function<Team, Piece> function;
 
-        PromotionEnum(String displayName, String partialFileName, Function<TeamAttributes, Piece> function) {
+        PromotionEnum(String displayName, String partialFileName, Function<Team, Piece> function) {
             this.displayName = displayName;
             this.partialFileName = partialFileName;
             this.function = function;
@@ -144,9 +142,9 @@ public class Promotion {
     private void selectPromotion(Piece pawn, PromotionEnum choice) {
         //// also is the 'close' for this 'window'
         choice.wrapper.setBackground(Background.fill(CLICKED));
-        root.getChildren().removeAll(overlay, borderPane);
+        boardRoot.getChildren().removeAll(overlay, borderPane);
 
-        TeamAttributes colour = pawn.teamColour;
+        Team colour = pawn.team;
 
         Piece piece = choice.function.apply(colour);
         getTile(pawn.coOrds, graphicBoard).deletePiece();

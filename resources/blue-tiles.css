@@ -1,0 +1,14 @@
+.root {
+-white-turn: whitesmoke;
+-black-turn: darkgray;
+
+
+-light-tile: linear-gradient(to bottom, #eef3fb, #dfe7f6);
+-dark-tile: linear-gradient(to bottom, #8da3c7, #6e87b2);
+
+//rgb(23, 124, 179);
+-board-back: rgb(0, 30, 10);
+-board-edge: gray;
+-move-tile: green;
+-capture-tile: red;
+}

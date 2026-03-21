@@ -1,96 +1,68 @@
 package org.chess;
 
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.Timeline;
 import javafx.beans.binding.Bindings;
 
 import javafx.beans.binding.NumberBinding;
 import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleDoubleProperty;
 import javafx.css.PseudoClass;
-import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.Scene;
+import javafx.scene.Node;
 import javafx.scene.control.Label;
-import javafx.scene.image.Image;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
-import javafx.stage.Stage;
+import javafx.util.Duration;
 
 
-import java.util.Objects;
-
+import static org.chess.Main.settings;
 import static org.chess.Tile.getTileCopy;
 import static org.chess.GraphicTile.ChessTileColours.*;
-import static org.chess.TeamAttributes.*;
 
 public class ChessBoard {
     static public GraphicTile[][] graphicBoard;
     static public Tile[][] virtualBoard;
     static final int BOARD_SIZE = 8;
-    final double GUI_SIZE = BOARD_SIZE + 1.5;
-    GridPane chessBoard;
-    Rectangle boardDecor;
+    final double GUI_SIZE = BOARD_SIZE + 2.5;
+    private GridPane gridPane;
 
-    protected static BooleanProperty turnProperty = new SimpleBooleanProperty(true);
+    protected static BooleanProperty turnProperty;
+    protected static DoubleProperty rotateProperty;
+
     /// / part of game loop.
     static BorderPane boardView;
-    static Label turnLabel;
-    static Label turnCountLabel;
-    static Label checkLabel;
 
 
-    static protected StackPane root;
-    Stage stage;
-
+    protected static StackPane boardRoot;
 
     ChessBoard() {
+        turnProperty = new SimpleBooleanProperty(true);
+        rotateProperty = new SimpleDoubleProperty(0.0);
+        boardRoot = new StackPane();
         makeBoardFromVisualTile2DArray();
+        boardRoot.getChildren().addAll(makeBoardView());
+    }
 
-        root = new StackPane();
-        root.getStylesheets().add(Objects.requireNonNull(ChessBoard.class.getResource("/chess-stylesheet.css")).toExternalForm());
-        chessBoard = new GridPane();
 
-        chessBoard.setHgap(5); // TODO: CSS HERE:
-        chessBoard.setVgap(5);
-        chessBoard.setGridLinesVisible(false);
-//        board.setPadding(new Insets(5));
-
-        chessBoard.setAlignment(Pos.CENTER);
-        chessBoard.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-
-        addStartingPieces();
-
-        boardDecor = new Rectangle();
-
-        //// IMPORTANT. Sizes the square which in turn sizes the whole board.
-        final double sizeToWindow = 0.97;
-        boardDecor.widthProperty().bind(
-                Bindings.min(chessBoard.heightProperty().multiply(sizeToWindow), chessBoard.widthProperty().multiply(sizeToWindow))
-        );
-        boardDecor.heightProperty().bind(
-                Bindings.min(chessBoard.heightProperty().multiply(sizeToWindow), chessBoard.widthProperty().multiply(sizeToWindow))
-        );
+    private Node makeBoardView() {
+        gridPane = new GridPane();
+        gridPane.getStyleClass().add("board-grid");
+        gridPane.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 
         addingBoardLabels();
 
-        //// putting tiles onto the board
+        //// putting tiles onto the graphic board
         makeGraphicBoard();
 
-        HBox infoWrapper = new HBox();
-        infoWrapper.getStyleClass().add("info-wrapper");
-
-        turnLabel = new Label();
-        turnLabel.getStyleClass().add("turn-counter-label");
-        turnLabel.setText("White's\nTurn");
-        turnCountLabel = new Label();
-        turnCountLabel.getStyleClass().add("turn-counter-label");
-        turnCountLabel.setText("Turn: 0");
-        checkLabel = new Label();
-
-
-        infoWrapper.getChildren().addAll(turnLabel, turnCountLabel, checkLabel);
-
-        StackPane initialWrapper = new StackPane(boardDecor, chessBoard);
+        //// IMPORTANT: Sizes the square which in turn sizes the whole board.
+        StackPane initialWrapper = new StackPane(makeBoardBackground("chessboard-edging", 0.96),
+                makeBoardBackground("chessboard-background", 0.9),
+                gridPane);
 
         PseudoClass lightBackground = PseudoClass.getPseudoClass("light");
         PseudoClass darkBackground = PseudoClass.getPseudoClass("dark");
@@ -101,35 +73,39 @@ public class ChessBoard {
         boardView.pseudoClassStateChanged(lightBackground, true);
         boardView.pseudoClassStateChanged(darkBackground, false);
 
+        gridPane.rotateProperty().bind(rotateProperty);
 
-        turnProperty.addListener((obs, oldVal, newVal) -> {
-            boardView.pseudoClassStateChanged(lightBackground, newVal);
-            boardView.pseudoClassStateChanged(darkBackground, oldVal);
-        });
+        if (settings.rotateBoard) {
+            turnProperty.addListener((obs, oldVal, newVal) -> {
+                Timeline flip = new Timeline(
+                        new KeyFrame(Duration.millis(500),
+                                new KeyValue(rotateProperty, rotateProperty.get() + 180))
+                );
+
+                flip.play();
+                boardView.pseudoClassStateChanged(lightBackground, newVal);
+                boardView.pseudoClassStateChanged(darkBackground, oldVal);
+            });
+        } else {
+            turnProperty.addListener((obs, oldVal, newVal) -> {
+                rotateProperty.set(rotateProperty.get() + 180);
+            });
+        }
+        return boardView;
+    }
 
 
-        infoWrapper.setAlignment(Pos.CENTER);
-        boardView.setTop(infoWrapper);
-        root.getChildren().add(boardView);
-
-        graphicBoard[5][5].addNewPiece(new Pawn(WHITE_TEAM), new int[]{5, 5});
-        decorateBoardAndCSS();
-
-        Scene chessBoardScene = new Scene(root, 1000, 700);
-//        chessBoardScene.setOnKeyPressed(keyEvent -> visuallyCheckDanger());
-        stage = new Stage();
-        stage.getIcons().add(new Image(Objects.requireNonNull(getClass().getResource("/images/w-king.png")).toExternalForm()));
-        stage.setTitle("Chess App");
-        stage.setScene(chessBoardScene);
-        stage.setMinWidth(300);
-        stage.setMinHeight(300);
-        stage.show();
-
-        virtualBoard = new Tile[BOARD_SIZE][BOARD_SIZE];
-        resetVirtualBoardToGraphicState();
-
-//        boardView.setBackground(new Background(new BackgroundFill(Color.PALEGREEN, CornerRadii.EMPTY, Insets.EMPTY)));
-
+    private Node makeBoardBackground(String styleClass, double size) {
+        Rectangle rectangle = new Rectangle();
+        rectangle.getStyleClass().add(styleClass);
+        rectangle.widthProperty().bind(
+                Bindings.min(gridPane.heightProperty().multiply(size), gridPane.widthProperty().multiply(size))
+        );
+        rectangle.heightProperty().bind(
+                Bindings.min(gridPane.heightProperty().multiply(size), gridPane.widthProperty().multiply(size))
+        );
+        rectangle.rotateProperty().bind(rotateProperty);
+        return rectangle;
     }
 
     public static void resetVirtualBoardToGraphicState() {
@@ -142,21 +118,30 @@ public class ChessBoard {
 
 
     private void addingBoardLabels() {
-        Label axisLabelX = null;
+        addHalfOfLabels(9, 0);
+
+        DoubleProperty A = addHalfOfLabels(0, 9);
+        gridPane.add(getSmallAccentOnCorner(A), 0, 0);
+        gridPane.add(getSmallAccentOnCorner(A), 0, 9);
+        gridPane.add(getSmallAccentOnCorner(A), 9, 0);
+        gridPane.add(getSmallAccentOnCorner(A), 9, 9);
+
+    }
+
+    private DoubleProperty addHalfOfLabels(int n1, int n2) {
+        Label axisLabelX;
         Label axisLabelY = null;
         for (int i = 0; i < BOARD_SIZE; i++) {
             axisLabelX = styleAxisLabel(new Label((char) ('A' + i) + ""));
             Pane pane1 = new StackPane();
             pane1.setBackground(Background.fill(Color.DARKGRAY));
             pane1.getChildren().add(axisLabelX);
-            chessBoard.add(pane1, i + 1, 9);
+            gridPane.add(pane1, i + 1, n1);
 
             Pane pane2 = new StackPane();
-            axisLabelY = new Label((i + 1) + "");
-            axisLabelY.setStyle("""
-                    -fx-font-family: "Times New Roman", Times, serif;
-                    -fx-font-weight: bold
-                    """);
+            axisLabelY = styleAxisLabel(new Label((i + 1) + ""));
+            pane2.setBackground(Background.fill(Color.DARKGRAY));
+            pane2.getChildren().add(axisLabelY);
 
             // because of the nature of text, we can bind the height to the other's width
             // and the width to the other's height
@@ -165,29 +150,25 @@ public class ChessBoard {
             axisLabelY.prefWidthProperty().bind(
                     axisLabelX.heightProperty());
 
-            pane2.setBackground(Background.fill(Color.DARKGRAY));
-            pane2.getChildren().add(axisLabelY);
+
             axisLabelY.setAlignment(Pos.CENTER);
-            chessBoard.add(pane2, 0, 8 - i);
+            gridPane.add(pane2, n2, 8 - i);
         }
 
+        return axisLabelY.prefWidthProperty();
+    }
 
-        //        Circle smallAccent = new Circle();
-//        smallAccent.setFill(WHITE_BOARD.paint);
-//        smallAccent.radiusProperty().bind(Bindings.min(
-//                axisLabelX.widthProperty().divide(2),
-//                axisLabelX.heightProperty().divide(2)));
+    private Pane getSmallAccentOnCorner(DoubleProperty A) {
         Rectangle smallAccent = new Rectangle();
         smallAccent.setFill(Color.GRAY);
-        smallAccent.heightProperty().bind(
-                axisLabelX.heightProperty());
-        smallAccent.widthProperty().bind(
-                axisLabelY.widthProperty());
+
+        smallAccent.heightProperty().bind(A);
+        smallAccent.widthProperty().bind(A);
+
         StackPane pane = new StackPane(smallAccent);
         pane.setAlignment(Pos.CENTER);
-        chessBoard.add(pane, 0, 9);
         pane.setOnMouseClicked(mouseEvent -> resetBoardHighlights());
-
+        return pane;
     }
 
     private void resetBoardHighlights() { // TODO: REMEMBER THIS LITTLE BUTTON!
@@ -199,12 +180,12 @@ public class ChessBoard {
     }
 
     private void makeGraphicBoard() {
-        NumberBinding tileSize = Bindings.min(boardDecor.widthProperty().divide(GUI_SIZE),
-                boardDecor.heightProperty().divide(GUI_SIZE));
+        NumberBinding tileSize = Bindings.min(gridPane.widthProperty().divide(GUI_SIZE),
+                gridPane.heightProperty().divide(GUI_SIZE));
         for (int i = 0; i < BOARD_SIZE; i++) {
             for (int j = 0; j < BOARD_SIZE; j++) {
                 GraphicTile tile = graphicBoard[i][j];
-                chessBoard.add(tile.pane, j + 1, 7 - i + 1);
+                gridPane.add(tile.pane, j + 1, 7 - i + 1);
 
                 tile.pane.setMaxSize(150, 150);
                 tile.pane.setMinSize(5, 5);
@@ -216,19 +197,13 @@ public class ChessBoard {
         }
     }
 
-    private void decorateBoardAndCSS() {
-
-
-        /// board
-        boardDecor.getStyleClass().add("chessboard-background");
-        /// turnLabel
-        turnLabel.getStyleClass().add("turn-counter-label");
-    }
 
     private Label styleAxisLabel(Label axisLabel) {
         axisLabel.getStyleClass().add("chess-axis");
         GraphicTile tile = graphicBoard[0][0];
         //
+
+        axisLabel.rotateProperty().bind(rotateProperty.negate());
         axisLabel.prefHeightProperty().bind(
                 Bindings.min(
                         tile.pane.widthProperty().divide(GUI_SIZE + 10),
@@ -240,32 +215,6 @@ public class ChessBoard {
         return axisLabel;
     }
 
-    private void addStartingPieces() {
-        //Pawns:
-        for (int i = 0; i < BOARD_SIZE; i++) {
-            graphicBoard[1][i].addNewPiece(new Pawn(WHITE_TEAM), new int[]{1, i});
-            graphicBoard[6][i].addNewPiece(new Pawn(BLACK_TEAM), new int[]{6, i});
-        }
-        //Pieces:
-        int row = 0;
-        TeamAttributes colour = TeamAttributes.WHITE_TEAM;
-        for (int i = 0; i < 2; i++) {
-            graphicBoard[row][0].addNewPiece(new Rook(colour), new int[]{row, 0});
-            graphicBoard[row][7].addNewPiece(new Rook(colour), new int[]{row, 7});
-            graphicBoard[row][1].addNewPiece(new Knight(colour), new int[]{row, 1});
-            graphicBoard[row][6].addNewPiece(new Knight(colour), new int[]{row, 6});
-            graphicBoard[row][2].addNewPiece(new Bishop(colour), new int[]{row, 2});
-            graphicBoard[row][5].addNewPiece(new Bishop(colour), new int[]{row, 5});
-            graphicBoard[row][3].addNewPiece(new Queen(colour), new int[]{row, 3});
-//            virtualBoard[row][4].addNewPiece(new King(colour), new int[]{row, 4});
-            colour.king = new King(colour);
-            graphicBoard[row][4].addNewPiece(colour.king, new int[]{row, 4});
-
-            colour = BLACK_TEAM;
-            row = 7;
-        }
-
-    }
 
     private void makeBoardFromVisualTile2DArray() {
         ////                     row: 1-8     col a-h

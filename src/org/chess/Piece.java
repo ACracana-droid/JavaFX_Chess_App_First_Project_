@@ -9,25 +9,23 @@ import java.util.Objects;
 
 import static org.chess.ChessBoard.BOARD_SIZE;
 import static org.chess.ChessBoard.graphicBoard;
-import static org.chess.GameLoop.*;
-import static org.chess.Queen.QUEEN_MOVE_VECTORS;
-import static org.chess.TeamAttributes.*;
+import static org.chess.ChessLoop.*;
+import static org.chess.Team.*;
 
 
 public abstract class Piece {
 
     char id;
     int[] coOrds;
-    TeamAttributes teamColour;
+    Team team;
     SpecialProperties property = SpecialProperties.DEFAULT;
 
     ImageView sprite;
 
-    Piece(TeamAttributes colour) {
-        this.teamColour = colour;
+    Piece(Team colour) {
+        this.team = colour;
         colour.pieces.add(this);
     }
-
 
     protected List<Move> infiniteDistancePieceMove(Tile[][] board, int[][] moveVectors) {
         List<Move> ls = new ArrayList<>();
@@ -42,7 +40,7 @@ public abstract class Piece {
                 col += vector[1];
             }
             if (row != xLimit && col != yLimit) {
-                if (!board[row][col].hasTeamOfThisColour(teamColour)) {
+                if (board[row][col].isPossibleMove(team)) {
                     ls.add(new Move(row, col));
                 } // otherwise it is an ally and a move is not allowed.
             }
@@ -59,10 +57,6 @@ public abstract class Piece {
         return false;
     }
 
-    public boolean isKing() {
-        return false;
-    }
-
     public boolean matchesPieceId(char id) {
         return this.id == id;
     }
@@ -72,36 +66,27 @@ public abstract class Piece {
 
     public ImageView getImageView(String partialFileName) {
         Image image = new Image(Objects.requireNonNull(getClass().getResource("/images/"
-                + (teamColour == WHITE_TEAM ? "w" : "b")
+                + (team == WHITE_TEAM ? "w" : "b")
                 + partialFileName)).toExternalForm());
         ImageView imageView = new ImageView(image);
-
         imageView.setPreserveRatio(true);
         //// to ensure resizing, the sprite is bound to the tile in the Tile class.
-
+        imageView.rotateProperty().bind(rotateProperty.negate());
         imageView.setSmooth(true);
         return imageView;
     }
 
 
-    protected static boolean isValidCoOrd(int rank, int file, TeamAttributes colour) {
+    protected static boolean isValidCoOrd(int rank, int file, Team colour) {
         return !(rank < 0 || rank >= BOARD_SIZE || file < 0 || file >= BOARD_SIZE)
-                && (!graphicBoard[rank][file].hasTeamOfThisColour(colour));
+                && (graphicBoard[rank][file].isPossibleMove(colour));
     }
 
     public void updateNecessaryFirstMoveInfo() {
     }
 
-    public boolean isSpecial() {
-        return false;
-    }
-
     public String toString() {
-        return teamColour.name() + " " + id;
-    }
-
-    public void deleteSprite() {
-        getVisualTile(coOrds).deletePiece();
+        return team.name() + " " + id;
     }
 
     public void setCoOrds(int[] coOrds) {
@@ -112,43 +97,9 @@ public abstract class Piece {
 }
 
 
-class King extends Piece implements SpecialMovePiece {
-
-    King(TeamAttributes colour) {
-        super(colour);
-        this.id = 'K';
-        this.sprite = getImageView("-king.png");
-//        this.property = SpecialProperties.CHECK_AND_MATE;
-    }
-
-    @Override
-    public boolean isKing() {
-        return true;
-    }
-
-    @Override
-    public List<Move> moves(Tile[][] board) {
-        List<Move> ls = new ArrayList<>();
-        int i = coOrds[0], j = coOrds[1];
-
-        for (int[] move : QUEEN_MOVE_VECTORS) {
-
-            int rank = i + move[0];
-            int file = j + move[1];
-            if (isValidCoOrd(rank, file, teamColour)) {
-                ls.add(new Move(rank, file));
-            }
-        }
-
-        return ls;
-    }
-
-}
-
-
 class Queen extends Piece {
 
-    Queen(TeamAttributes colour) {
+    Queen(Team colour) {
         super(colour);
         this.id = 'Q';
         this.sprite = getImageView("-queen.png");
@@ -175,17 +126,27 @@ class Queen extends Piece {
 
 }
 
-class Rook extends Piece implements SpecialMovePiece {
+class Rook extends Piece implements SpecialFirstMover {
+    boolean firstMove = true;
+
+    @Override
+    public void updateNecessaryFirstMoveInfo() {
+        firstMove = false;
+    }
 
 
-    Rook(TeamAttributes colour) {
+    public boolean isFirstMove() {
+        return firstMove;
+    }
+
+    Rook(Team colour) {
         super(colour);
         this.id = 'R';
         this.sprite = getImageView("-rook.png");
 //        this.property = SpecialProperties.CASTLE;
     }
 
-    private final int[][] moveVectors = {
+    private static final int[][] ROOK_MOVE_VECTORS = {
             {1, 0},
             {0, 1},
             {-1, 0},
@@ -195,7 +156,7 @@ class Rook extends Piece implements SpecialMovePiece {
 
     @Override
     public List<Move> moves(Tile[][] board) {
-        return infiniteDistancePieceMove(board, moveVectors);
+        return infiniteDistancePieceMove(board, ROOK_MOVE_VECTORS);
     }
 
 
@@ -203,13 +164,14 @@ class Rook extends Piece implements SpecialMovePiece {
 
 class Knight extends Piece {
 
-    Knight(TeamAttributes colour) {
+
+    Knight(Team colour) {
         super(colour);
         this.id = 'k';
         this.sprite = getImageView("-knight.png");
     }
 
-    static final int[][] moveVectors = {
+    private static final int[][] KNIGHT_MOVE_VECTORS = {
             {2, 1},
             {1, 2},
             {-1, 2},
@@ -226,10 +188,10 @@ class Knight extends Piece {
         int i = coOrds[0], j = coOrds[1];
         List<Move> ls = new ArrayList<>();
 
-        for (int[] move : moveVectors) {
+        for (int[] move : KNIGHT_MOVE_VECTORS) {
             int rank = i + move[0];
             int file = j + move[1];
-            if (isValidCoOrd(rank, file, teamColour))
+            if (isValidCoOrd(rank, file, team))
                 ls.add(new Move(rank, file)); // valid location.
         }
 
@@ -239,7 +201,7 @@ class Knight extends Piece {
 }
 
 class Bishop extends Piece {
-    private final int[][] moveVectors = {
+    private final static int[][] BISHOP_MOVE_VECTORS = {
             {1, 1},
             {1, -1},
             {-1, 1},
@@ -247,7 +209,7 @@ class Bishop extends Piece {
     };
 
 
-    Bishop(TeamAttributes colour) {
+    Bishop(Team colour) {
         super(colour);
         this.id = 'B';
         this.sprite = getImageView("-bishop.png");
@@ -255,22 +217,22 @@ class Bishop extends Piece {
 
     @Override
     public List<Move> moves(Tile[][] virtualBoard) {
-        return infiniteDistancePieceMove(virtualBoard, moveVectors);
+        return infiniteDistancePieceMove(virtualBoard, BISHOP_MOVE_VECTORS);
     }
 }
 
-class Pawn extends Piece implements SpecialMovePiece {
-    boolean firstMove = true;
+class Pawn extends Piece implements SpecialFirstMover {
+    private boolean firstMove = true;
 
-    Pawn(TeamAttributes colour) {
+    Pawn(Team colour) {
         super(colour);
         this.id = 'p';
         this.sprite = getImageView("-pawn.png");
 //        this.property = SpecialProperties.PROMOTABLE;
     }
 
-    final int moveVector = (teamColour.equals(WHITE_TEAM) ? 1 : -1);
-    final int LIMIT = (teamColour.equals(WHITE_TEAM) ? BOARD_SIZE : -1);
+    final int moveVector = (team.equals(WHITE_TEAM) ? 1 : -1);
+    final int LIMIT = (team.equals(WHITE_TEAM) ? BOARD_SIZE : -1);
 
     @Override
     public List<Move> moves(Tile[][] board) {
@@ -281,8 +243,8 @@ class Pawn extends Piece implements SpecialMovePiece {
         if (row == LIMIT) return ls;
         diagonalCaptures(ls, row, false, board);
         int col;
-        if (GameLoop.isEnPassantValid(coOrds, board))
-            ls.add(enPassant(board));
+        if (ChessLoop.isEnPassantValid(coOrds, board))
+            ls.add(enPassant());
         col = coOrds[1];
         if (!board[row][col].hasPiece()) {
             ls.add(new Move(row, col));
@@ -320,7 +282,7 @@ class Pawn extends Piece implements SpecialMovePiece {
 
     }
 
-    private Move enPassant(Tile[][] board) {
+    private Move enPassant() {
         Piece captureInPassing = getPrevEnemyPiece();
         return new Move(captureInPassing.coOrds[0] + this.moveVector, captureInPassing.coOrds[1], SpecialProperties.EN_PASSANT);
     }

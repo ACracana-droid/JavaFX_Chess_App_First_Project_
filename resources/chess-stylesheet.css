@@ -1,18 +1,27 @@
-.root {
--white-turn: whitesmoke;
--black-turn: darkgray;
--light-tile: antiquewhite;
--dark-tile: gray;
--move-tile: blue;
--capture-tile: red;
+.corner-decor {
 
--fx-background-color: beige;
--fx-padding: 5;
+}
+
+.axis-label {
+-fx-font-family: "Times New Roman", Times, serif;
+-fx-font-weight: bold
 }
 
 .info-wrapper {
 -fx-spacing: 20;
 -fx-padding: 10;
+}
+
+.chess-button {
+-fx-pref-width: 220;
+//-fx-color: gray;
+-fx-alignment: CENTER;
+}
+
+.board-grid {
+-fx-hgap: 5;
+-fx-vgap: 5;
+-fx-alignment: center;
 }
 
 .turn-counter-label {
@@ -25,19 +34,17 @@
 }
 
 .board-view {
--fx-border-width: 12;
+-fx-border-width: 4;
 -fx-border-color: black;
--fx-background-color: white;
+-fx-corner-radius: 20;
 }
 
 .board-view:light {
 -fx-background-color: -white-turn;
--fx-corner-radius: 20;
 }
 
 .board-view:dark {
 -fx-background-color: -black-turn;
--fx-corner-radius: 20;
 }
 
 .chess-axis {
@@ -46,7 +53,10 @@
 }
 
 .chessboard-background {
- -fx-background-color: gray;
+ -fx-fill: -board-back;
+}
+.chessboard-edging {
+-fx-fill: -board-edge;
 }
 
 .chess-tile {

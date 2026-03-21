@@ -1,33 +1,104 @@
 package org.chess;
 
-import javafx.scene.layout.StackPane;
+import javafx.geometry.Pos;
+import javafx.scene.Node;
+import javafx.scene.control.Label;
+import javafx.scene.layout.HBox;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 import static org.chess.Pawn.getDiagonalCaptures;
-import static org.chess.TeamAttributes.*;
+import static org.chess.Team.*;
 
-public class GameLoop extends ChessBoard {
+public class ChessLoop extends ChessBoard {
 
-    static private TeamAttributes alliedTeam;
-    static private TeamAttributes enemyTeam;
-    static private Piece lastMovedEnemyPiece = null;
+    private static final int STALE_MOVE_COUNT_RULE = 50;
+
+    static private Team alliedTeam;
+    static private Team enemyTeam;
+    static private Piece lastMovedEnemyPiece;
     static private int turnCount;
-    static private List<Move> shownMoves = null;
-    static public StackPane hidden;
+    static Label turnLabel;
+    static Label turnCountLabel;
+    static Label checkLabel;
 
+    static private int halfMoveClock;
+    private static boolean stalemateFlag;
+
+
+    static private List<Move> shownMoves = null;
 
     enum BoardState {
-        DEFAULT, CHECK, CHECKMATE
+        DEFAULT, CHECK, CHECKMATE, STALEMATE
     }
 
-    GameLoop() {
+    ChessLoop() {
+        super();
+        lastMovedEnemyPiece = null;
+        BLACK_TEAM.pieces.clear();
+        WHITE_TEAM.pieces.clear();
+        boardView.setTop(makeInfoWrapper());
         turnCount = 0;
-        hidden = new StackPane();
+
+        halfMoveClock = 0;
         alliedTeam = WHITE_TEAM;
         enemyTeam = BLACK_TEAM;
+        addStartingPieces(); // could animate
+        /*
+        for developing or experimenting purposes, you can add new pieces you want the game
+        to start with here.
+        use the addNewPiece function and specify coOrds.
+        */
+
+        virtualBoard = new Tile[BOARD_SIZE][BOARD_SIZE];
+        resetVirtualBoardToGraphicState();
+
+    }
+
+    private Node makeInfoWrapper() {
+        HBox hBox = new HBox();
+        hBox.getStyleClass().add("info-wrapper");
+
+        turnLabel = new Label();
+        turnLabel.getStyleClass().add("turn-counter-label");
+        turnLabel.setText("White's\nTurn");
+        turnCountLabel = new Label();
+        turnCountLabel.getStyleClass().add("turn-counter-label");
+        turnCountLabel.setText("Turn: 0");
+        checkLabel = new Label();
+
+        hBox.getChildren().addAll(turnLabel, turnCountLabel, checkLabel);
+        hBox.setAlignment(Pos.CENTER);
+        boardView.setTop(hBox);
+        return hBox;
+    }
+
+    private void addStartingPieces() {
+        //Pawns:
+        for (int i = 0; i < BOARD_SIZE; i++) {
+            graphicBoard[1][i].addNewPiece(new Pawn(WHITE_TEAM), new int[]{1, i});
+            graphicBoard[6][i].addNewPiece(new Pawn(BLACK_TEAM), new int[]{6, i});
+        }
+        //Pieces:
+        int row = 0;
+        Team colour = WHITE_TEAM;
+        for (int i = 0; i < 2; i++) {
+            graphicBoard[row][0].addNewPiece(new Rook(colour), new int[]{row, 0});
+            graphicBoard[row][7].addNewPiece(new Rook(colour), new int[]{row, 7});
+            graphicBoard[row][1].addNewPiece(new Knight(colour), new int[]{row, 1});
+            graphicBoard[row][6].addNewPiece(new Knight(colour), new int[]{row, 6});
+            graphicBoard[row][2].addNewPiece(new Bishop(colour), new int[]{row, 2});
+            graphicBoard[row][5].addNewPiece(new Bishop(colour), new int[]{row, 5});
+            graphicBoard[row][3].addNewPiece(new Queen(colour), new int[]{row, 3});
+//            virtualBoard[row][4].addNewPiece(new King(colour), new int[]{row, 4});
+            colour.setKing(new King(colour));
+            graphicBoard[row][4].addNewPiece(colour.getKing(), new int[]{row, 4});
+
+            colour = BLACK_TEAM;
+            row = 7;
+        }
 
     }
 
@@ -42,18 +113,14 @@ public class GameLoop extends ChessBoard {
     }
 
 
-    // modern stuff
-    private static Piece orig_piece;
-    private static Piece dest_piece;
-
     public static List<Piece> virtualMovePiece(int[] origin, Move move, Tile[][] board) {
 
         List<Piece> virtualEnemyPieceList = new ArrayList<>(enemyTeam.pieces);
 
         Tile originTile = getTile(origin, board);
         Tile destTile = getTile(move, board);
-        orig_piece = originTile.piece;
-        dest_piece = destTile.piece;
+        Piece orig_piece = originTile.piece;
+        Piece dest_piece = destTile.piece;
 
         originTile.deletePiece();
         originTile.deselect();
@@ -78,36 +145,47 @@ public class GameLoop extends ChessBoard {
         return virtualEnemyPieceList;
     }
 
-    public static void undoMovePiece(Tile[][] board) { // requires work if to be used.
-        getTile(orig_piece.coOrds, board).addPiece(orig_piece, orig_piece.coOrds);
+    private static void moveAuxilliaryPiece(MultiMove move, Tile[][] board) {
+        System.out.println("MOVE!");
+        Piece piece = getTile(move.auxilliaryOrigin, board).piece;
+        getTile(move.auxilliaryOrigin, board).deletePiece();
+        getTile(move.auxilliaryOrigin, board).deselect();
 
-        if (orig_piece.isPawn() && dest_piece != null && getTile(dest_piece.coOrds, board) != null) {
-            getTile(lastMovedEnemyPiece.coOrds, board).addPiece(lastMovedEnemyPiece, lastMovedEnemyPiece.coOrds);
-        } else if (dest_piece != null) getTile(dest_piece.coOrds, board).addPiece(dest_piece, dest_piece.coOrds);
+        /// capture is unimplemented. Can't happen.
+
+        getTile(move.auxilliaryMove, board).addNewPiece(piece, move.getCoOrds());
+        piece.updateNecessaryFirstMoveInfo();
     }
 
-
-    static public void movePiece(Tile originalLocation, Tile nextLocation, Move move) {
+    static public void moveMainPiece(Tile orig, Tile dest, Move move) {
+        stalemateFlag = false;
         System.out.println("MOVE!");
-        Piece piece = originalLocation.piece;
-        originalLocation.deletePiece();
-        originalLocation.deselect();
+        Piece piece = orig.piece;
+        orig.deletePiece();
+        orig.deselect();
 
 
-        if (nextLocation.hasPiece()) { //// must be a capture
+        if (dest.hasPiece()) { //// must be a capture
             System.out.println("KILL!");
-            getAlliedTeam().capturedPieces.add(nextLocation.piece); // can add to display.
-            enemyTeam.pieces.remove(nextLocation.piece);
-            nextLocation.deletePiece();
+            getAlliedTeam().capturedPieces.add(dest.piece); // can add to display.
+            enemyTeam.pieces.remove(dest.piece);
+            dest.deletePiece();
+
+            stalemateFlag = true;
         }
 
-        nextLocation.addNewPiece(piece, move.getCoOrds());
+        dest.addNewPiece(piece, move.getCoOrds());
 
+        /// castle
+        if (move.property.equals(SpecialProperties.CASTLE)) {
+            moveAuxilliaryPiece(((MultiMove) move), graphicBoard);
+        }
 
         if (piece.isPawn()) {
+            stalemateFlag = true;
             if (move.getRow() == alliedTeam.PROMOTION_RANK) {
                 System.out.println("PROMOTE!!");
-                new Promotion(piece, root);
+                new Promotion(piece, boardRoot);
                 //// function will call updateGameLoop() - it must in order to compensate for how java runs threads.
                 lastMovedEnemyPiece = piece;
                 return;
@@ -120,12 +198,12 @@ public class GameLoop extends ChessBoard {
                     case PAWN_DOUBLE_STEP -> piece.property = SpecialProperties.EN_PASSANT;
                     case EN_PASSANT -> {
                         System.out.println("EN PASSANT!!!!");
-                        Piece passedPiece = getVisualTile(lastMovedEnemyPiece.coOrds).piece;
+                        Piece passedPiece = getGraphicTile(lastMovedEnemyPiece.coOrds).piece;
                         getAlliedTeam().capturedPieces.add(passedPiece);
                         enemyTeam.pieces.remove(passedPiece);
 
                         System.out.println(Arrays.toString(lastMovedEnemyPiece.coOrds));
-                        getVisualTile(lastMovedEnemyPiece.coOrds).deletePiece();
+                        getGraphicTile(lastMovedEnemyPiece.coOrds).deletePiece();
                         piece.property = SpecialProperties.DEFAULT;
                     }
                 }
@@ -133,11 +211,32 @@ public class GameLoop extends ChessBoard {
 
 
         }
+
         piece.updateNecessaryFirstMoveInfo();
         lastMovedEnemyPiece = piece;
         updateGameLoop();
     }
 
+    public static List<int[]> getThreats(List<Piece> enemyTeam, Tile[][] board) {
+        List<int[]> ls = new ArrayList<>();
+        for (Piece piece : enemyTeam) {
+            if (piece.isPawn()) {
+                for (Move move : getDiagonalCaptures((Pawn) piece, board)) {
+                    ls.add(move.getCoOrds());
+                }
+            } else if (piece.matchesPieceId('K')) {
+                /// Necessary. Causes stack overflow otherwise.
+                for (Move move : ((King) piece).threatsIgnoreLegal()) {
+                    ls.add(move.getCoOrds());
+                }
+            } else {
+                for (Move move : piece.moves(board)) {
+                    ls.add(move.getCoOrds());
+                }
+            }
+        }
+        return ls;
+    }
 
     /// shouldn't be graphic but alas.
     public static boolean isNotThreatToKing(List<Piece> enemyTeam, int[] kingCoOrds, Tile[][] board) {
@@ -161,7 +260,7 @@ public class GameLoop extends ChessBoard {
     }
 
     static public void showMoves(List<Move> moves) {
-        System.out.println("showing moves: ");
+        System.out.println("showing moves: "); //TODO: REMOVE SOUT
 
         for (Move move : moves) {
             if (move.property == SpecialProperties.EN_PASSANT) {  // splitting the decisions...
@@ -172,30 +271,8 @@ public class GameLoop extends ChessBoard {
             System.out.println(move);
         }
         shownMoves = moves;
-        System.out.println();
         //// List must be tracked so moves can be hidden.
     }
-
-//    static public void showMoves(List<int[]> moves, SpecialProperties property) {
-//        switch (property) {
-//            case PROMOTABLE:
-//                for (int[] move : moves) {
-//                    if (move[0] == alliedTeam.PROMOTION_RANK) {
-//                        graphicBoard[move[0]][move[1]].showPromotionHighlight();
-//                    } else {
-//                        graphicBoard[move[0]][move[1]].showStandardLocationHighlight();
-//                    }
-//                    System.out.println(Arrays.toString(move));
-//                }
-//                shownMoves = moves;
-//                break;
-//            case CHECK_AND_MATE:
-//
-//                break;
-//            default:
-//                showMoves(moves);
-//        }
-//    }
 
 
     static public void hideMoves() {
@@ -205,89 +282,86 @@ public class GameLoop extends ChessBoard {
         }
     }
 
+
     static public void updateGameLoop() {
+
+        // TODO: TWO BUGS:
+        // fix the death of an attacking king. Able to attack when attack brings king into check.
+        // Take king without ending game.
+
         turnCount++;
+
+        if (stalemateFlag) halfMoveClock = 0;
+        else halfMoveClock++;
+
+        if (halfMoveClock >= STALE_MOVE_COUNT_RULE) {
+            endChessGame(BoardState.STALEMATE);
+            return;
+        }
+
         turnProperty.set(!turnProperty.getValue());
-        TeamAttributes swap = alliedTeam;
+        Team swap = alliedTeam;
         alliedTeam = enemyTeam;
         enemyTeam = swap;
+
 
         switch (getBoardState(alliedTeam.pieces)) {
             case CHECKMATE -> {
                 checkLabel.setText("CHECKMATE!");
-                endChessGame();
+                checkLabel.getStyleClass().add("turn-counter-label");
+                endChessGame(BoardState.CHECKMATE);
                 return;
             }
             case CHECK -> {
                 checkLabel.setText("CHECK!");
+                checkLabel.getStyleClass().add("turn-counter-label");
+
             }
             case DEFAULT -> {
                 checkLabel.setText("");
+                checkLabel.getStyleClass().remove("turn-counter-label");
+
             }
         }
-//        checkLabel.setStyle("""
-//                fx-font: 100px "Arial";
-//                fx-fill: light blue;
-//                """);
-
-
         turnLabel.setText(alliedTeam.turnLabelText);
         turnCountLabel.setText("Turn: " + turnCount);
     }
 
-    private static void endChessGame() {
+    private static void endChessGame(BoardState state) {
         System.out.println("END GAME!");
+        System.out.println(state.name().toLowerCase());
 
     }
 
     private static BoardState getBoardState(List<Piece> pieceList) {
         List<Move> validMoves = new ArrayList<>();
         resetVirtualBoardToGraphicState();
-
-
         for (Piece piece : pieceList) {
             validMoves.addAll(getTile(piece.coOrds, virtualBoard).getValidMoves(piece.coOrds));
         }
-
-
         if (validMoves.isEmpty()) {
-            return BoardState.CHECKMATE;
+            if (isNotThreatToKing(enemyTeam.pieces, getAlliedTeam().getKing().coOrds, virtualBoard))
+                return BoardState.STALEMATE;
+            else return BoardState.CHECKMATE;
         }
-        if (!isNotThreatToKing(enemyTeam.pieces, getAlliedTeam().king.coOrds, virtualBoard)) {
+        if (!isNotThreatToKing(enemyTeam.pieces, getAlliedTeam().getKing().coOrds, virtualBoard)) {
             return BoardState.CHECK;
         }
 
         return BoardState.DEFAULT;
     }
 
-
-    static void setCheckFlag() {
-        //useless, can get rid.
-    }
-
-    static public TeamAttributes getAlliedTeam() {
+    static public Team getAlliedTeam() {
         return alliedTeam;
     }
 
-    static public TeamAttributes getEnemyTeam() {
+    static public Team getEnemyTeam() {
         return enemyTeam;
     }
 
     public static Piece getPrevEnemyPiece() {
         return lastMovedEnemyPiece;
     }
-
-
-//        if (lastMovedEnemyPiece == null) return false;
-//        Tile current = getPrevSelected();
-//        if (current == null || !current.hasPiece() || !current.piece.isPawn()) return false;
-//        System.out.println("FIRST PART OF EN PASSANT PASSED!!");
-//
-//        //// EN PASSANT!
-//        return lastMovedEnemyPiece.getVulnerableToEnPassant()
-//                && current.piece.coOrds[0] == lastMovedEnemyPiece.coOrds[0]
-//                && Math.abs(current.piece.coOrds[1] - lastMovedEnemyPiece.coOrds[1]) == 1; // when this happens, the condition PAWN_DOUBLE_STEP is permanently impossible to get. removed.
-
 
     public static boolean isEnPassantValid(int[] coOrds, Tile[][] board) {
         if (lastMovedEnemyPiece == null) return false;
@@ -300,11 +374,11 @@ public class GameLoop extends ChessBoard {
                 && Math.abs(current.piece.coOrds[1] - lastMovedEnemyPiece.coOrds[1]) == 1;
     }
 
-    public static GraphicTile getVisualTile(int[] coOrds) {
+    public static GraphicTile getGraphicTile(int[] coOrds) {
         return graphicBoard[coOrds[0]][coOrds[1]];
     }
 
-    public static GraphicTile getVisualTile(Piece piece) {
+    public static GraphicTile getGraphicTile(Piece piece) {
         return graphicBoard[piece.coOrds[0]][piece.coOrds[1]];
     }
 

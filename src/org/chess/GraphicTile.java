@@ -8,7 +8,7 @@ import javafx.scene.shape.Circle;
 
 import java.util.List;
 
-import static org.chess.GameLoop.*;
+import static org.chess.ChessLoop.*;
 
 public class GraphicTile extends Tile {
 
@@ -44,17 +44,11 @@ public class GraphicTile extends Tile {
     }
 
     public void selectTile() {
-
-        if (property != null) {
-            System.out.println(property.name());
-        } else {
-            System.out.println("no property");
-        }
-
-
         if (prevSelected == null) {
             if (this.hasAlliedTeam()) //// initiate move.
                 selectFirstPiece();
+        } else if (this.equals(prevSelected)) {
+            this.deselect();
         } else { //// either move or cancel move
             if (this.hasAlliedTeam()) {
                 prevSelected.deselect();
@@ -66,7 +60,7 @@ public class GraphicTile extends Tile {
                     // then a piece is not deselected if an empty tile is pressed.
                     // This could be valid -> could be set as a preference.
                 } else {
-                    movePiece(prevSelected, this, move);
+                    moveMainPiece(prevSelected, this, move);
                 }
             }
 
@@ -90,21 +84,9 @@ public class GraphicTile extends Tile {
     }
 
     @Override
-    public void addPiece(Piece newPiece, int[] coOrds) {
-        super.addPiece(newPiece, coOrds);
-
-        pane.getChildren().add(piece.sprite);
-    }
-
-    @Override
     public void deletePiece() {
-        getVisualTile(piece).deleteSprite();
+        getGraphicTile(piece).deleteSprite();
         this.piece = null;
-    }
-
-    public void overridePiece(Piece override) {
-        deletePiece();
-        if (override != null) addPiece(override, override.coOrds);
     }
 
     public void showStandardLocationHighlight() {
@@ -147,11 +129,6 @@ public class GraphicTile extends Tile {
 
     @Override
     public void deselect() {
-//        for (Tile[] rank : graphicBoard) {
-//            for (Tile tile : rank) {
-//                tile.setProperty(SpecialProperties.DEFAULT);
-//            }
-//        }
         prevSelected = null;
         hideMoves();
         pane.getChildren().remove(selectedIndicator);
